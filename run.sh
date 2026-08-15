@@ -67,7 +67,7 @@ prevent-client-proxy-connections = false
 player-info-forwarding-mode = "modern"
 forwarding-secret-file = "forwarding.secret"
 announce-forge = false
-kick-existing-players = true
+kick-existing-players = false
 ping-passthrough = "DISABLED"
 enable-player-address-logging = true
 
@@ -187,11 +187,12 @@ if ! kill -0 $SERVER_PID 2>/dev/null; then
   exit 1
 fi
 
-# Telegram live console: stream server.log to chat every 5s
+# Telegram live console: stream server.log (and velocity.log on the proxy) to chat every 5s
 if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
   echo "==> Telegram console streaming enabled"
   (
     last=$(wc -c < server.log 2>/dev/null || echo 0)
+    vlast=$(wc -c < velocity.log 2>/dev/null || echo 0)
     while kill -0 $SERVER_PID 2>/dev/null; do
       sleep 5
       now=$(wc -c < server.log 2>/dev/null || echo 0)
@@ -201,6 +202,17 @@ if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
         if [ -n "$msg" ]; then
           curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             -d chat_id="$TELEGRAM_CHAT_ID" -d text="$msg" >/dev/null 2>&1 || true
+        fi
+      fi
+      if [ -f velocity.log ]; then
+        vnow=$(wc -c < velocity.log 2>/dev/null || echo 0)
+        if [ "$vnow" -gt "$vlast" ]; then
+          vmsg=$(tail -c +$((vlast+1)) velocity.log 2>/dev/null | tail -c 3000)
+          vlast=$vnow
+          if [ -n "$vmsg" ]; then
+            curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+              -d chat_id="$TELEGRAM_CHAT_ID" -d text="[proxy] $vmsg" >/dev/null 2>&1 || true
+          fi
         fi
       fi
     done
