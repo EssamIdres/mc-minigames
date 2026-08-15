@@ -7,6 +7,8 @@ JAVA_HEAP="${JAVA_HEAP:-10G}"
 BACKUP_KEEP=3
 BACKUP_INTERVAL=3600
 PAPER_VERSION="${PAPER_VERSION:-1.21.1}"
+VELOCITY_VERSION="${VELOCITY_VERSION:-4.0.0}"
+VELOCITY_BUILD="${VELOCITY_BUILD:-6}"
 
 mkdir -p ~/.config/rclone
 
@@ -35,6 +37,100 @@ if [ -n "$PLAYIT_SECRET" ]; then
   sleep 10
   echo "==> Playit log (find your tunnel address here):"
   cat playit.log
+fi
+
+# Velocity proxy (only on the proxy host, e.g. mc-lobby)
+if [ "$PROXY_HOST" = "true" ]; then
+  echo "==> Setting up Velocity proxy..."
+  if [ ! -f velocity.jar ]; then
+    VEL_URL=$(curl -fsSL -H "User-Agent: mc-bot (https://github.com/EssamIdres)" \
+      "https://fill.papermc.io/v3/projects/velocity/versions/${VELOCITY_VERSION}/builds/${VELOCITY_BUILD}" | \
+      jq -r '.downloads."server:default".url')
+    echo "==> Downloading Velocity: $VEL_URL"
+    curl -fsSL -o velocity.jar "$VEL_URL"
+  fi
+
+  if [ -z "$VELOCITY_SECRET" ]; then
+    echo "==> ERROR: VELOCITY_SECRET not set. Cannot start proxy."
+    exit 1
+  fi
+  printf '%s' "$VELOCITY_SECRET" > forwarding.secret
+
+  cat > velocity.toml <<'EOF'
+config-version = "2.8"
+bind = "0.0.0.0:25565"
+motd = "<#09add3>MC Network"
+show-max-players = 100
+online-mode = false
+force-key-authentication = false
+prevent-client-proxy-connections = false
+player-info-forwarding-mode = "modern"
+forwarding-secret-file = "forwarding.secret"
+announce-forge = false
+kick-existing-players = true
+ping-passthrough = "DISABLED"
+enable-player-address-logging = true
+
+[servers]
+lobby = "127.0.0.1:25566"
+survival = "tissues-economy.tun.ply.gg:25565"
+minigames = "tissues-heard.tun.ply.gg:25565"
+creative = "tissues-individuals.tun.ply.gg:25565"
+
+try = ["lobby"]
+
+[forced-hosts]
+
+[advanced]
+compression-threshold = 256
+compression-level = -1
+login-ratelimit = 3000
+connection-timeout = 5000
+read-timeout = 30000
+haproxy-protocol = false
+tcp-fast-open = false
+bungee-plugin-message-channel = true
+show-ping-requests = false
+failover-on-unexpected-server-disconnect = true
+announce-proxy-commands = true
+log-command-executions = false
+log-player-connections = true
+accepts-transfers = false
+enable-reuse-port = false
+command-rate-limit = 50
+forward-commands-if-rate-limited = true
+kick-after-rate-limited-commands = 0
+tab-complete-rate-limit = 10
+kick-after-rate-limited-tab-completes = 0
+
+[query]
+enabled = false
+port = 25565
+map = "Velocity"
+show-plugins = false
+EOF
+
+  # Lobby Paper backend must listen on 25566 (internal), proxy takes 25565
+  sed -i 's/^server-port=.*/server-port=25566/' server.properties
+
+  echo "==> Starting Velocity proxy..."
+  java -Xms512M -Xmx1G -jar velocity.jar > velocity.log 2>&1 &
+  VELOCITY_PID=$!
+  echo "==> Velocity PID: $VELOCITY_PID"
+  sleep 5
+fi
+
+# Configure Velocity modern forwarding on the Paper backend
+if [ -n "$VELOCITY_SECRET" ]; then
+  echo "==> Configuring Velocity forwarding for Paper..."
+  mkdir -p config
+  cat > config/paper-global.yml <<EOF
+proxies:
+  velocity:
+    enabled: true
+    online-mode: false
+    secret: "$VELOCITY_SECRET"
+EOF
 fi
 
 # Named pipe so we can send server commands (save-all) reliably
