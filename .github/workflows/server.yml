@@ -1,0 +1,37 @@
+name: mc-server
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  run-server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install rclone
+        run: |
+          curl -fsSL -o /tmp/rclone.zip https://downloads.rclone.org/rclone-current-linux-amd64.zip
+          cd /tmp && unzip -o rclone.zip
+          sudo cp /tmp/rclone-*/rclone /usr/local/bin/rclone
+          sudo chmod +x /usr/local/bin/rclone
+          rclone version
+
+      - name: Setup rclone config
+        run: |
+          mkdir -p ~/.config/rclone
+          echo '${{ secrets.RCLONE_CONFIG }}' > ~/.config/rclone/rclone.conf
+
+      - name: Run Minecraft server (backups every 1 min, keep 3)
+        run: bash ./run.sh
+        env:
+          PLAYIT_SECRET: ${{ secrets.PLAYIT_SECRET }}
