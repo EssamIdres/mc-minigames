@@ -5,7 +5,7 @@ SERVER_NAME="${SERVER_NAME:-$(basename "$(pwd)")}"
 DRIVE_ROOT="mcworlds:minecraft/$SERVER_NAME"
 JAVA_HEAP="${JAVA_HEAP:-10G}"
 BACKUP_KEEP=3
-BACKUP_INTERVAL=60
+BACKUP_INTERVAL=3600
 PAPER_VERSION="${PAPER_VERSION:-1.21.1}"
 
 mkdir -p ~/.config/rclone
