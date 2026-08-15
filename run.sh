@@ -73,6 +73,43 @@ if ! kill -0 $SERVER_PID 2>/dev/null; then
   exit 1
 fi
 
+# Telegram live console: stream server.log to chat every 5s
+if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+  echo "==> Telegram console streaming enabled"
+  (
+    last=$(wc -c < server.log 2>/dev/null || echo 0)
+    while kill -0 $SERVER_PID 2>/dev/null; do
+      sleep 5
+      now=$(wc -c < server.log 2>/dev/null || echo 0)
+      if [ "$now" -gt "$last" ]; then
+        msg=$(tail -c +$((last+1)) server.log 2>/dev/null | tail -c 3000)
+        last=$now
+        if [ -n "$msg" ]; then
+          curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            -d chat_id="$TELEGRAM_CHAT_ID" -d text="$msg" >/dev/null 2>&1 || true
+        fi
+      fi
+    done
+  ) &
+  TG_STREAM_PID=$!
+fi
+
+# Telegram command channel: poll repo for console-cmd.txt and feed to server pipe
+if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ] && [ -n "$GITHUB_TOKEN" ]; then
+  (
+    while kill -0 $SERVER_PID 2>/dev/null; do
+      sleep 4
+      line=$(curl -fsSL "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/console-cmd.txt" 2>/dev/null | head -1 || true)
+      if [ -n "$line" ]; then
+        echo "==> TG command: $line"
+        echo "$line" >&3
+        curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
+          "https://api.github.com/repos/$GITHUB_REPOSITORY/contents/console-cmd.txt" >/dev/null 2>&1 || true
+      fi
+    done
+  ) &
+fi
+
 # Backup loop: every 60s, save + upload, keep only newest N
 echo "==> Starting backup loop (every ${BACKUP_INTERVAL}s, keep ${BACKUP_KEEP})..."
 BACKUP_ROOT="/tmp/backups"
