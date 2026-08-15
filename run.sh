@@ -117,7 +117,16 @@ EOF
   java -Xms512M -Xmx1G -jar velocity.jar > velocity.log 2>&1 &
   VELOCITY_PID=$!
   echo "==> Velocity PID: $VELOCITY_PID"
-  sleep 5
+  sleep 10
+  if kill -0 $VELOCITY_PID 2>/dev/null; then
+    echo "==> Velocity is UP"
+  else
+    echo "==> VELOCITY DIED. velocity.log:"
+    tail -50 velocity.log
+    exit 1
+  fi
+  echo "==> velocity.log:"
+  tail -20 velocity.log
 fi
 
 # Configure Velocity modern forwarding on the Paper backend
