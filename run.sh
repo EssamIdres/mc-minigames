@@ -6,6 +6,7 @@ DRIVE_ROOT="mcworlds:minecraft/$SERVER_NAME"
 JAVA_HEAP="${JAVA_HEAP:-10G}"
 BACKUP_KEEP=3
 BACKUP_INTERVAL=60
+PAPER_VERSION="${PAPER_VERSION:-1.21.1}"
 
 mkdir -p ~/.config/rclone
 
@@ -17,11 +18,8 @@ echo "eula=true" > eula.txt
 
 # Download Paper if not present
 if [ ! -f server.jar ]; then
-  echo "==> Downloading Paper..."
-  curl -fsSL -H "User-Agent: mc-bot (https://github.com/EssamIdres)" https://fill.papermc.io/v3/projects/paper > /tmp/paper.json
-  VERSION=$(jq -r '.versions | to_entries[0] | .value[0]' /tmp/paper.json)
-  echo "==> Paper version: $VERSION"
-  curl -fsSL -H "User-Agent: mc-bot (https://github.com/EssamIdres)" "https://fill.papermc.io/v3/projects/paper/versions/${VERSION}/builds" > /tmp/builds.json
+  echo "==> Downloading Paper $PAPER_VERSION..."
+  curl -fsSL -H "User-Agent: mc-bot (https://github.com/EssamIdres)" "https://fill.papermc.io/v3/projects/paper/versions/${PAPER_VERSION}/builds" > /tmp/builds.json
   URL=$(jq -r 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".url)' /tmp/builds.json)
   echo "==> Downloading jar: $URL"
   curl -fsSL -o server.jar "$URL"
