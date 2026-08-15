@@ -133,6 +133,15 @@ proxies:
 EOF
 fi
 
+# Restore latest backup (persistent world) if one exists
+if rclone lsf "$DRIVE_ROOT/backups" --dirs-only 2>/dev/null | grep -q .; then
+  NEWEST=$(rclone lsf "$DRIVE_ROOT/backups" --dirs-only 2>/dev/null | sort -r | head -1)
+  echo "==> Restoring latest backup: $NEWEST"
+  rclone copy "$DRIVE_ROOT/backups/$NEWEST/" . 2>&1 | tail -3 || true
+else
+  echo "==> No backups found — generating a fresh world."
+fi
+
 # Named pipe so we can send server commands (save-all) reliably
 PIPE=/tmp/mc-in
 rm -f "$PIPE"
