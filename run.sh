@@ -208,8 +208,14 @@ if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ] && [ -n "$GITHUB_T
       if [ -n "$line" ]; then
         echo "==> TG command: $line"
         echo "$line" >&3
-        curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
-          "https://api.github.com/repos/$GITHUB_REPOSITORY/contents/console-cmd.txt" >/dev/null 2>&1 || true
+        SHA=$(curl -fsSL -H "Authorization: token $GITHUB_TOKEN" \
+          "https://api.github.com/repos/$GITHUB_REPOSITORY/contents/console-cmd.txt" 2>/dev/null | jq -r '.sha' || true)
+        if [ -n "$SHA" ] && [ "$SHA" != "null" ]; then
+          curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" -H "Content-Type: application/json" \
+            -d "{\"message\":\"delete console cmd\",\"sha\":\"$SHA\"}" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/contents/console-cmd.txt" >/dev/null 2>&1 || true
+        fi
       fi
     done
   ) &
