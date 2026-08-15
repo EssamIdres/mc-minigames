@@ -31,8 +31,7 @@ if [ -n "$PLAYIT_SECRET" ]; then
   curl -fsSL -o playit https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-amd64
   chmod +x playit
   printf 'secret_key = "%s"\n' "$PLAYIT_SECRET" > playit.toml
-  mkdir -p playit_gg/run/playit
-  ./playit > playit.log 2>&1 &
+  ./playit --socket-path="$PWD/playitd.sock" --secret-path="$PWD/playit.toml" > playit.log 2>&1 &
   sleep 10
   echo "==> Playit log (find your tunnel address here):"
   cat playit.log
